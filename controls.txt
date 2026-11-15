@@ -1,0 +1,166 @@
+===============================================================================
+  DOMINATRIX  //  CONTROLS QUICK REFERENCE
+  Castle Danger Music Company
+===============================================================================
+
+Dominatrix is a glue compressor for your master bus, with saturation, analog
+character and a soft clipper that takes the place of your limiter. Put it LAST
+on your master channel.
+
+There are no threshold, ratio, attack or release knobs. DISCIPLINE sets all of
+them for you, and they keep adjusting to the music. You can watch what she's
+doing in THE RULES panel.
+
+Tip: double-click a knob to reset it. Double-click the value under a knob to
+type an exact number.
+
+
+-------------------------------------------------------------------------------
+DISCIPLINE  (the big knob)
+-------------------------------------------------------------------------------
+  How hard Dominatrix holds the mix together. 0 = off (no compression at all).
+
+  Around 20-40%   gentle glue, 0.5-2 dB of gain reduction. Most mixes live here.
+  Around 50-70%   firm control, denser and more "finished".
+  75-100%         heavy, pumping-free squash. Good for parallel use with MIX.
+
+  What she sets for you:
+    THRESHOLD  follows the level of your mix, so DISCIPLINE feels the same
+               whether your mix is quiet or hot.
+    RATIO      from 1.5:1 (gentle) up to 4:1 (full discipline).
+    ATTACK     10-30 ms. Punchy material gets a slower attack so the
+               transients (kick, snare) still hit; dense material gets a
+               faster one.
+    RELEASE    automatic, two-stage: short peaks let go fast, long sustained
+               compression lets go slowly, so it glues without pumping.
+    MAKEUP     automatic, so turning DISCIPLINE up doesn't just make it
+               quieter.
+    The low end (below about 90 Hz) is kept out of the detector so the kick
+    and bass don't make the whole mix duck. Left and right are linked so the
+    stereo image stays put.
+
+
+-------------------------------------------------------------------------------
+SATURATION + SATURATION TYPE
+-------------------------------------------------------------------------------
+  SATURATION adds harmonics. 0 = clean. The level is compensated, so turning
+  it up adds colour, not just volume. Pick the flavour:
+
+  TAPE      Warm and smooth. Loud high frequencies get softened first, like
+            real tape.
+  TUBE      Rich even (2nd) harmonics. Sweet and thick.
+  IRON      Output-transformer weight: the low end saturates more than the
+            top, so bass gets fat and solid.
+  CONSOLE   Subtle summing-bus glue. The gentlest one.
+  WHIP      Bite and edge. Firm odd harmonics with a little upper-mid push.
+            Use a little!
+
+  Switching types crossfades smoothly, so you can flip between them while
+  the music plays.
+
+
+-------------------------------------------------------------------------------
+ANALOG
+-------------------------------------------------------------------------------
+  Character and imperfections of older analog gear. 0 = digital clean.
+  Turning it up adds, a little at a time:
+    - tape wow & flutter (very slight pitch wobble)
+    - a low-end "head bump" and a softer top end
+    - left and right channels that don't quite match (level and tone)
+    - a touch of crosstalk between left and right
+    - a little component non-linearity
+    - tape hiss and a faint mains hum, way down in the noise floor
+    - slow "drift", as if the gear is warming up
+  It's all subtle on purpose. 10-30% is plenty for most masters.
+
+
+-------------------------------------------------------------------------------
+MIX
+-------------------------------------------------------------------------------
+  Parallel ("New York") compression. 100 = all Dominatrix. Lower values blend
+  the uncompressed, unsaturated mix back in. Dry and wet are kept perfectly
+  in time, so there's no phasing.
+
+
+-------------------------------------------------------------------------------
+OUTPUT + CEILING  (this replaces your limiter)
+-------------------------------------------------------------------------------
+  CEILING sets the highest your master can ever go:
+
+    -1 dB    LOUD MASTER. Use this for releases and streaming.
+    -6 dB    HEADROOM. Use this when you're sending the mix to a mastering
+             engineer, or want room for more processing later.
+    OFF      No clipper. OUTPUT is just a volume knob.
+
+  OUTPUT pushes the mix into a soft, transparent clipper sitting at the
+  ceiling. The more you turn OUTPUT up, the more it clips, and the louder the
+  master gets, but it never goes past the ceiling. Below the clipper's knee
+  (about 2 dB under the ceiling) nothing is touched at all.
+
+  The ceiling is a TRUE-PEAK ceiling: a final safety stage catches the tiny
+  in-between-sample peaks that clipping creates, so a -1 dB ceiling really
+  is -1 dBTP, which is what the streaming services ask for.
+
+  Watch the CLIP meter: 1-3 dB is usually invisible, 4-6 dB gets loud and
+  dense, beyond that you'll start to hear it on cymbals and vocals.
+
+
+-------------------------------------------------------------------------------
+QUALITY
+-------------------------------------------------------------------------------
+  Oversampling for the saturation and the clipper: 2x, 4x (default) or 8x.
+  Higher = cleaner top end and more CPU. 4x is plenty while you work; pick
+  8x for the final bounce if you like. Changing it changes the plugin's
+  latency (your DAW compensates automatically).
+
+
+-------------------------------------------------------------------------------
+MATCH  (level-matched listening)
+-------------------------------------------------------------------------------
+  Louder always sounds better, which makes it hard to judge what you're
+  doing. MATCH turns the output down (or up) to the same loudness as the
+  input, so when you bypass and un-bypass you hear what Dominatrix does, not
+  just "louder". A yellow MATCHED LISTENING bar shows on the meters while it's
+  on. TURN IT OFF BEFORE YOU BOUNCE. It isn't saved in presets.
+
+
+-------------------------------------------------------------------------------
+METERS
+-------------------------------------------------------------------------------
+  GAIN REDUCTION  the big needle: how much DISCIPLINE is compressing (dB).
+  THE RULES       what the automatic compressor has set right now.
+  IN / OUT        peak levels in and out.
+  CLIP            how hard the clipper is working (dB). The white line holds
+                  the recent peak. Shows OFF when the ceiling is off.
+  LUFS            loudness of the output (before MATCH). SHORT-TERM is the last
+                  3 seconds; INTEGRATED is the whole song since you last reset
+                  it. Click the LUFS display to reset INTEGRATED. As a guide,
+                  most streaming services play back around -14 LUFS.
+  The red lamp next to the logo burns brighter the harder she works.
+
+
+-------------------------------------------------------------------------------
+PRESETS
+-------------------------------------------------------------------------------
+  Pick a factory preset from the list, step through with < and >, or SAVE
+  your own. User presets are shared by every project and every DAW:
+
+    macOS:    ~/Library/Application Support/Castle Danger/Dominatrix/Presets/
+    Windows:  %APPDATA%\Castle Danger\Dominatrix\Presets\
+
+  Factory presets:
+    Init                        a sensible starting point
+    Gentle Discipline           light glue for nearly anything
+    Mix Bus Glue (-6 Headroom)  for mixes going to a mastering engineer
+    Streaming Master            glued and loud, -1 dB true-peak ceiling
+    Loud & Proud                more glue, more clipping, more loudness
+    Tube Warmth                 thick even-harmonic warmth
+    Iron Fist                   heavy glue + fat transformer low end
+    Console Summing             analog desk vibe
+    Leather & Lace              smooth tape glue, part parallel
+    Crack the Whip              edgy, bright, aggressive
+    Tape Machine                lots of analog tape character
+    Vintage Broadcast           heavy, old-radio-style control
+    New York Parallel           hard compression blended under the dry mix
+    Total Control               maximum discipline
+    Safe Word (Clipper Only)    no compression, no colour: just the clipper
