@@ -75,6 +75,14 @@ public:
     bool clipperOff = false, match = false;
 };
 
+// Stereo phase correlation: -1 (cancels in mono) .. 0 (very wide) .. +1 (mono)
+class PhaseMeter : public juce::Component
+{
+public:
+    void paint (juce::Graphics&) override;
+    float value = 1.0f;
+};
+
 // Short-term + integrated LUFS; click to reset the integrated reading
 class LoudnessDisplay : public juce::Component, public juce::SettableTooltipClient
 {
@@ -143,10 +151,11 @@ private:
     DominatrixProcessor& proc;
     DomLookAndFeel lnf;
     std::vector<std::unique_ptr<Knob>> knobs;
-    Knob *disciplineKnob = nullptr, *satKnob = nullptr, *analogKnob = nullptr, *mixKnob = nullptr, *outKnob = nullptr;
+    Knob *disciplineKnob = nullptr, *satKnob = nullptr, *analogKnob = nullptr, *mixKnob = nullptr, *outKnob = nullptr, *widthKnob = nullptr;
     Selector typeSel, ceilSel, qualitySel;
-    juce::ToggleButton matchButton { "MATCH" };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> matchAtt;
+    juce::ToggleButton matchButton { "MATCH" }, bassMonoButton { "BASS MONO" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> matchAtt, bassMonoAtt;
+    PhaseMeter phase;
     juce::TooltipWindow tooltips { this, 700 };
     VuMeter vu;
     PilotLamp lamp;
@@ -164,7 +173,7 @@ private:
     std::vector<Plate> plates;
     juce::Rectangle<int> logoArea, badgeArea, crestArea, presetArea, stripeArea, meterArea;
     juce::Image backdrop, logoImage;
-    float inMeter = 0, outMeter = 0, clipMeter = 0, clipHold = 0, grSmooth = 0, flicker = 0;
+    float phaseSmooth = 1.0f, inMeter = 0, outMeter = 0, clipMeter = 0, clipHold = 0, grSmooth = 0, flicker = 0;
     int holdTimer = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DominatrixEditor)

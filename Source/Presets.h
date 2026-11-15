@@ -7,7 +7,7 @@ namespace dom
 {
 struct Preset { juce::String name; std::vector<std::pair<juce::String, float>> values; };
 
-// satType: 0 Tape, 1 Tube, 2 Iron, 3 Console, 4 Whip | ceiling: 0 = -1 dB, 1 = -6 dB, 2 = Off | quality: 0 2x, 1 4x, 2 8x
+// width: 0..200 % | bassMono: 0/1 | satType: 0 Tape, 1 Tube, 2 Iron, 3 Console, 4 Whip | ceiling: 0 = -1 dB, 1 = -6 dB, 2 = Off | quality: 0 2x, 1 4x, 2 8x
 // Anything not listed uses the default (DISCIPLINE 30, SATURATION 20 Tape, ANALOG 15, MIX 100, OUTPUT 0, CEILING -1 dB).
 inline const std::vector<Preset>& factoryPresets()
 {
@@ -25,6 +25,7 @@ inline const std::vector<Preset>& factoryPresets()
         { "Tape Machine",              { { "discipline", 20 }, { "saturation", 45 }, { "analog", 70 } } },
         { "Vintage Broadcast",         { { "discipline", 75 }, { "satType", 1 }, { "saturation", 35 }, { "analog", 60 }, { "outputDb", 2.0f } } },
         { "New York Parallel",         { { "discipline", 90 }, { "satType", 2 }, { "saturation", 30 }, { "mix", 45 }, { "outputDb", 2.0f } } },
+        { "Wide Screen",               { { "discipline", 35 }, { "saturation", 20 }, { "analog", 15 }, { "width", 135 }, { "bassMono", 1 }, { "outputDb", 2.0f } } },
         { "Total Control",             { { "discipline", 100 }, { "satType", 1 }, { "saturation", 25 }, { "analog", 20 }, { "outputDb", 4.0f } } },
         { "Safe Word (Clipper Only)",  { { "discipline", 0 }, { "saturation", 0 }, { "analog", 0 } } },
     };

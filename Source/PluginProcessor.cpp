@@ -26,6 +26,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout DominatrixProcessor::createL
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "satType", 1 }, "Saturation Type", StringArray { "Tape", "Tube", "Iron", "Console", "Whip" }, 0));
     p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { "analog", 1 }, "Analog", NormalisableRange<float> (0.0f, 100.0f, 0.1f), 15.0f, pctAttr));
     p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { "mix", 1 }, "Mix", NormalisableRange<float> (0.0f, 100.0f, 0.1f), 100.0f, pctAttr));
+    p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { "width", 1 }, "Width", NormalisableRange<float> (0.0f, 200.0f, 0.1f), 100.0f, pctAttr));
+    p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "bassMono", 1 }, "Bass Mono", false));
     p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { "outputDb", 1 }, "Output", NormalisableRange<float> (-12.0f, 12.0f, 0.1f), 0.0f, dbAttr));
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "ceiling", 1 }, "Ceiling", StringArray { "-1 dB", "-6 dB", "Off" }, 0));
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "quality", 1 }, "Quality", StringArray { "2x", "4x", "8x" }, 1));
@@ -46,6 +48,8 @@ dom::Params DominatrixProcessor::currentParams() const
     p.ceiling = (int) v ("ceiling");
     p.quality = (int) v ("quality");
     p.match = v ("match") > 0.5f;
+    p.width = v ("width") * 0.01f;
+    p.bassMono = v ("bassMono") > 0.5f;
     return p;
 }
 

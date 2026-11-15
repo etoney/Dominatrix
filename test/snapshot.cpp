@@ -22,6 +22,12 @@ static void setP (DominatrixProcessor& p, const char* id, float v)
     rp->setValueNotifyingHost (rp->convertTo0to1 (v));
 }
 
+static int prog (DominatrixProcessor& p, const juce::String& name)
+{
+    for (int i = 0; i < p.getNumPrograms(); ++i) if (p.getProgramName (i) == name) return i;
+    return 0;
+}
+
 static void allOff (DominatrixProcessor& p)
 {
     p.setCurrentProgram (0);
@@ -95,6 +101,7 @@ static float truePeak (const std::vector<float>& v)
         float* ptr[] = { tmp.data() };
         juce::dsp::AudioBlock<float> b (ptr, 1, 512);
         auto up = os.processSamplesUp (b);
+        if (pos == 0) continue;   // skip the meter's own start-up (it starts from silence mid-waveform)
         for (size_t i = 0; i < up.getNumSamples(); ++i) m = std::max (m, std::abs (up.getSample (0, (int) i)));
     }
     return m;
@@ -144,9 +151,26 @@ int main (int argc, char** argv)
                 std::printf ("preset %d out %+4.0f: peak %.2f  TP %.2f dBTP  clip %.2f\n", pre, o, juce::Decibels::gainToDecibels (peak (y.l)),
                              juce::Decibels::gainToDecibels (truePeak (y.l)), p.getEngine().clipDb.exchange (0));
             }
+        {
+            auto st = [] (int64_t n, int ch)
+            {
+                const double t = (double) n / 48000.0;
+                const double mid = 0.3 * std::sin (juce::MathConstants<double>::twoPi * 440.0 * t);
+                const double side = 0.15 * std::sin (juce::MathConstants<double>::twoPi * 1300.0 * t) + 0.1 * std::sin (juce::MathConstants<double>::twoPi * 60.0 * t);
+                return (float) (ch == 0 ? mid + side : mid - side);
+            };
+            for (float wd : { 100.0f, 200.0f })
+                for (float o : { 6.0f, 12.0f })
+                    for (int q : { 0, 1, 2 })
+                    {
+                        p.setCurrentProgram (0); setP (p, "width", wd); setP (p, "outputDb", o); setP (p, "quality", (float) q);
+                        const auto y = render (p, st, 2.0, 1.0);
+                        std::printf ("sines width %.0f out %+.0f q%d: TP L %.2f R %.2f\n", wd, o, q, juce::Decibels::gainToDecibels (truePeak (y.l)), juce::Decibels::gainToDecibels (truePeak (y.r)));
+                    }
+        }
         for (int qq = 0; qq < 3; ++qq)
         {
-            p.setCurrentProgram (13); setP (p, "quality", (float) qq);
+            p.setCurrentProgram (prog (p, "Total Control")); setP (p, "quality", (float) qq);
             const auto t0 = juce::Time::getMillisecondCounterHiRes();
             render (p, drumMix (0.9f), 20.0, 30.0);
             const auto ms = juce::Time::getMillisecondCounterHiRes() - t0;
@@ -376,6 +400,66 @@ int main (int argc, char** argv)
                juce::String::formatted ("LUFS: -20 dBFS 1 kHz stereo reads -20 LUFS (integrated %.2f, short-term %.2f)", integ, st));
     }
 
+    // ---------------- WIDTH
+    {
+        // a stereo test signal: shared centre + different sides (incl. a low side component)
+        auto st = [] (int64_t n, int ch)
+        {
+            const double t = (double) n / 48000.0;
+            const double mid = 0.3 * std::sin (juce::MathConstants<double>::twoPi * 440.0 * t);
+            const double side = 0.15 * std::sin (juce::MathConstants<double>::twoPi * 1300.0 * t) + 0.1 * std::sin (juce::MathConstants<double>::twoPi * 60.0 * t);
+            return (float) (ch == 0 ? mid + side : mid - side);
+        };
+        auto sideOf = [] (const Render& r, float lpHz)
+        {   // RMS of the side signal; lpHz > 0 isolates the 60 Hz part, < 0 the 1.3 kHz part
+            std::vector<float> s (r.l.size());
+            for (size_t i = 0; i < s.size(); ++i) s[i] = 0.5f * (r.l[i] - r.r[i]);
+            return (float) juce::Decibels::gainToDecibels (dftMag (trim (s, 16384), lpHz > 0 ? 60.0 : 1300.0, 48000.0) + 1e-12);
+        };
+        allOff (p);
+        const auto ref = render (p, st, 1.5, 0.75);
+        allOff (p); setP (p, "width", 100);
+        const auto same = render (p, st, 1.5, 0.75);
+        float err = 0; for (size_t i = 0; i < same.l.size(); ++i) err = std::max ({ err, std::abs (same.l[i] - ref.l[i]), std::abs (same.r[i] - ref.r[i]) });
+        check (err == 0.0f, "WIDTH 100 changes nothing");
+
+        allOff (p); setP (p, "width", 0);
+        const auto mono = render (p, st, 1.5, 0.75);
+        float d = 0; for (size_t i = 0; i < mono.l.size(); ++i) d = std::max (d, std::abs (mono.l[i] - mono.r[i]));
+        check (d < 1e-4f, juce::String::formatted ("WIDTH 0 is mono (max L-R %.2g)", d));
+
+        allOff (p); setP (p, "width", 160);
+        const auto wide = render (p, st, 3.0, 2.0);
+        const float hiRef = sideOf (ref, -1), hiWide = sideOf (wide, -1), loRef = sideOf (ref, 1), loWide = sideOf (wide, 1);
+        const float midRef = (float) juce::Decibels::gainToDecibels (dftMag (trim (ref.l, 16384), 440.0, 48000.0));
+        const float midWide = (float) juce::Decibels::gainToDecibels (dftMag (trim (wide.l, 16384), 440.0, 48000.0));
+        std::printf ("   width 160: side @1.3k %+.2f dB, side @60 Hz %+.2f dB, centre %+.2f dB\n", hiWide - hiRef, loWide - loRef, midWide - midRef);
+        check (hiWide - hiRef > 2.0f, "WIDTH 160 widens the sides");
+        check (std::abs ((loWide - loRef) - (midWide - midRef)) < 1.0f, "WIDTH never widens the lows (they follow the centre)");
+        check (std::abs (rmsDb (wide.l) - rmsDb (ref.l)) < 1.5f, juce::String::formatted ("WIDTH keeps the loudness (%+.2f dB)", rmsDb (wide.l) - rmsDb (ref.l)));
+
+        allOff (p); setP (p, "bassMono", 1);
+        const auto bm = render (p, st, 1.5, 0.75);
+        check (sideOf (bm, 1) - loRef < -20.0f && std::abs (sideOf (bm, -1) - hiRef) < 0.5f,
+               juce::String::formatted ("BASS MONO removes the low side (%.1f dB) and leaves the rest", sideOf (bm, 1) - loRef));
+
+        for (int ceil : { 0, 1 })
+        {
+            p.setCurrentProgram (0); setP (p, "ceiling", (float) ceil); setP (p, "width", 200); setP (p, "outputDb", 12);
+            const auto y = render (p, st, 2.0, 1.0);
+            const float lim = juce::Decibels::decibelsToGain (ceil == 0 ? -1.0f : -6.0f);
+            const float tp = std::max (truePeak (y.l), truePeak (y.r));
+            check (std::max (peak (y.l), peak (y.r)) <= lim + 1e-5f && juce::Decibels::gainToDecibels (tp / lim) < 0.3f,
+                   juce::String::formatted ("ceiling holds at WIDTH 200 (%s, sample peak %.2f, true peak %.2f dBTP)", ceil == 0 ? "-1" : "-6", juce::Decibels::gainToDecibels (std::max (peak (y.l), peak (y.r))), juce::Decibels::gainToDecibels (tp)));
+        }
+        // phase meter
+        allOff (p); render (p, sine (0.3f, 500.0f), 1.0, 1.0);
+        const float c1 = p.getEngine().correlation.load();
+        allOff (p); render (p, [] (int64_t n, int ch) { return (ch ? -0.3f : 0.3f) * (float) std::sin (juce::MathConstants<double>::twoPi * 500.0 * (double) n / 48000.0); }, 1.0, 1.0);
+        const float c2 = p.getEngine().correlation.load();
+        check (c1 > 0.99f && c2 < -0.99f, juce::String::formatted ("phase meter reads +1 for mono, -1 for out of phase (%.2f, %.2f)", c1, c2));
+    }
+
     // ---------------- presets
     for (int i = 0; i < p.getNumPrograms(); ++i)
     {
@@ -421,11 +505,14 @@ int main (int argc, char** argv)
         run (drumMix (0.9f), 40);
         check (writePng (ed->createComponentSnapshot (ed->getLocalBounds(), true, 2.0f), dir.getChildFile ("gui.png")), "main snapshot");
 
-        q.setCurrentProgram (13); // Total Control
+        q.setCurrentProgram (prog (q, "Total Control"));
         run (drumMix (0.9f), 30);
         check (writePng (ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f), dir.getChildFile ("gui_heavy.png")), "heavy snapshot");
 
-        q.setCurrentProgram (14); // Safe Word
+        q.setCurrentProgram (prog (q, "Wide Screen"));
+        run (drumMix (0.7f), 20);
+        check (writePng (ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f), dir.getChildFile ("gui_wide.png")), "wide snapshot");
+        q.setCurrentProgram (prog (q, "Safe Word (Clipper Only)"));
         setP (q, "ceiling", 2); setP (q, "match", 1);
         run (drumMix (0.5f), 20);
         check (writePng (ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f), dir.getChildFile ("gui_off.png")), "clipper off / match snapshot");

@@ -83,6 +83,34 @@ MIX
 
 
 -------------------------------------------------------------------------------
+WIDTH + STEREO  (new in 1.1)
+-------------------------------------------------------------------------------
+  WIDTH changes how wide the mix sounds. It splits the mix into the centre
+  ("mid": kick, bass, lead vocal, snare) and the sides (stereo guitars, keys,
+  reverb, room) and turns only the sides up or down. The centre stays put.
+
+    100%       no change (default)
+    above 100  wider and more open (up to 200%)
+    below 100  narrower; 0% is fully mono (handy for checking your mix)
+
+  80-140% is the useful range on a master. Past 150% (the knob's arc turns
+  red) mixes start to sound phasey and hollow.
+
+  Built-in safety:
+    - The low end (below about 120 Hz) is never widened, so kick and bass
+      stay solid.
+    - Loudness is compensated, so wider doesn't just mean louder.
+    - The ceiling and true-peak protection still apply after WIDTH.
+
+  PHASE      shows how mono-safe your mix is. +1 = mono, around +0.3 to
+             +0.8 = a healthy stereo mix, 0 = very wide, below 0 (red) =
+             parts of your mix will cancel out on mono speakers.
+  BASS MONO  makes everything below about 120 Hz completely mono, so the
+             kick and bass sit dead centre on every system (and cut cleanly
+             to vinyl). Most masters benefit from it.
+
+
+-------------------------------------------------------------------------------
 OUTPUT + CEILING  (this replaces your limiter)
 -------------------------------------------------------------------------------
   CEILING sets the highest your master can ever go:
@@ -162,5 +190,6 @@ PRESETS
     Tape Machine                lots of analog tape character
     Vintage Broadcast           heavy, old-radio-style control
     New York Parallel           hard compression blended under the dry mix
+    Wide Screen                 glue plus a wider mix, bass kept mono
     Total Control               maximum discipline
     Safe Word (Clipper Only)    no compression, no colour: just the clipper

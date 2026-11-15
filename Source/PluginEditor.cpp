@@ -250,7 +250,16 @@ void DomLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, i
     g.setColour (juce::Colour (0xff120e0c).withAlpha (alpha)); g.strokePath (track, juce::PathStrokeType (thick + 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     g.setColour (juce::Colour (0xff3a2418).withAlpha (alpha)); g.strokePath (track, juce::PathStrokeType (thick, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     juce::Path val; val.addCentredArc (c.x, c.y, ar, ar, 0, startAngle, angle, true);
-    const auto arcCol = (s.isMouseOverOrDragging() ? pal::signalHot : pal::signal).withAlpha (alpha);
+    const bool isWidth = s.getName() == "width";
+    if (isWidth)
+    {
+        // mark the danger zone past 150 %
+        const float dz = startAngle + 0.75f * (endAngle - startAngle);
+        juce::Path zone; zone.addCentredArc (c.x, c.y, r - 1.5f, r - 1.5f, 0, dz, endAngle, true);
+        g.setColour (pal::signalHot.withAlpha (0.55f * alpha)); g.strokePath (zone, juce::PathStrokeType (2.0f));
+    }
+    const auto arcCol = (isWidth ? (pos > 0.75f ? pal::signalHot : pal::hazard)
+                                 : (s.isMouseOverOrDragging() ? pal::signalHot : pal::signal)).withAlpha (alpha);
     g.setColour (arcCol.withAlpha (0.25f * alpha));
     g.strokePath (val, juce::PathStrokeType (thick + 4.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     g.setColour (arcCol);
@@ -313,8 +322,8 @@ void DomLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b,
     g.setColour (juce::Colours::black.withAlpha (0.7f)); g.drawEllipse (led, 1.0f);
 
     g.setColour (on ? pal::paint : pal::paintDim);
-    g.setFont (tex::stencil (15.0f).withExtraKerningFactor (0.1f));
-    g.drawText (b.getButtonText(), r.withTrimmedLeft (r.getHeight() * 1.0f).withTrimmedRight (6), juce::Justification::centredLeft);
+    g.setFont (r.getWidth() < 120.0f ? tex::stencil (12.5f).withExtraKerningFactor (0.04f) : tex::stencil (15.0f).withExtraKerningFactor (0.1f));
+    g.drawFittedText (b.getButtonText(), r.withTrimmedLeft (r.getHeight() * 1.0f).withTrimmedRight (6).toNearestInt(), juce::Justification::centredLeft, 1, 0.6f);
 }
 
 //==============================================================================
@@ -600,6 +609,36 @@ void RulesDisplay::paint (juce::Graphics& g)
 }
 
 //==============================================================================
+void PhaseMeter::paint (juce::Graphics& g)
+{
+    auto r = getLocalBounds().toFloat();
+    g.setColour (pal::screen); g.fillRoundedRectangle (r, 4.0f);
+    auto inner = r.reduced (8.0f, 6.0f);
+    auto head = inner.removeFromTop (12.0f);
+    g.setColour (pal::paintDim); g.setFont (tex::plainBold (8.5f).withExtraKerningFactor (0.12f));
+    g.drawText ("PHASE", head, juce::Justification::centredLeft);
+    const auto col = value < 0.0f ? pal::signalHot : (value < 0.3f ? pal::hazard : pal::paint);
+    g.setColour (col); g.setFont (ledFont (11.0f));
+    g.drawText ((value >= 0 ? "+" : "") + juce::String (value, 2), head, juce::Justification::centredRight);
+    auto bar = inner.removeFromTop (12.0f).translated (0.0f, 3.0f);
+    g.setColour (juce::Colour (0xff171210)); g.fillRect (bar);
+    auto half = bar.withTrimmedRight (bar.getWidth() * 0.5f);
+    g.setColour (pal::signal.withAlpha (0.25f)); g.fillRect (half);                       // red zone: below 0
+    g.setColour (pal::paintDim.withAlpha (0.5f)); g.fillRect (bar.getCentreX() - 0.5f, bar.getY(), 1.0f, bar.getHeight());
+    const float x = bar.getX() + (juce::jlimit (-1.0f, 1.0f, value) + 1.0f) * 0.5f * bar.getWidth();
+    juce::Path needle; needle.addRectangle (x - 1.5f, bar.getY() - 2.0f, 3.0f, bar.getHeight() + 4.0f);
+    juce::DropShadow (col.withAlpha (0.8f), 6, {}).drawForPath (g, needle);
+    g.setColour (col); g.fillPath (needle);
+    g.setColour (pal::paintDim.withAlpha (0.6f)); g.setFont (tex::plainBold (7.5f));
+    auto lab = inner.removeFromTop (12.0f).translated (0.0f, 4.0f);
+    g.drawText ("-1", lab, juce::Justification::centredLeft);
+    g.drawText ("0", lab, juce::Justification::centred);
+    g.drawText ("+1", lab, juce::Justification::centredRight);
+    g.setColour (juce::Colours::black); g.drawRoundedRectangle (r, 4.0f, 2.0f);
+    g.setColour (pal::rust.withAlpha (0.35f)); g.drawRoundedRectangle (r.reduced (2.0f), 3.0f, 1.0f);
+}
+
+//==============================================================================
 void LoudnessDisplay::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
@@ -731,6 +770,9 @@ DominatrixEditor::DominatrixEditor (DominatrixProcessor& p)
     mixKnob    = &makeKnob ("mix", "MIX", "Parallel blend: 100 = all Dominatrix, lower = blend the uncompressed mix back in.");
     outKnob    = &makeKnob ("outputDb", "OUTPUT",
         "Drives the soft clipper. With CEILING at -1 or -6 dB, the more you turn up, the more it clips (and it never goes past the ceiling). With CEILING OFF it's a plain output level.");
+    widthKnob  = &makeKnob ("width", "WIDTH",
+        "Stereo width. 100 = unchanged, 0 = mono, up to 200 = wider. Only the sides change; the centre (kick, bass, vocal) stays put, and the lows below ~120 Hz are never widened. Past 150 % mixes start to sound phasey: watch the PHASE meter.");
+    widthKnob->slider.setName ("width");
     disciplineKnob->label.setFont (tex::stencil (21.0f).withExtraKerningFactor (0.12f));
 
     for (auto* s : { &typeSel, &ceilSel, &qualitySel }) addAndMakeVisible (*s);
@@ -741,6 +783,12 @@ DominatrixEditor::DominatrixEditor (DominatrixProcessor& p)
     matchButton.setName ("match");
     matchButton.setTooltip ("Level-matched listening: turns the output down (or up) to the same loudness as the input, so you hear what Dominatrix does, not just 'louder'. Turn it off before you bounce!");
     addAndMakeVisible (matchButton);
+    bassMonoButton.setName ("bassMono");
+    bassMonoButton.setTooltip ("Makes everything below ~120 Hz mono, so the kick and bass sit dead centre and play right on any system (and on vinyl).");
+    addAndMakeVisible (bassMonoButton);
+    bassMonoAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (p.apvts, "bassMono", bassMonoButton);
+    addAndMakeVisible (phase);
+    phase.setInterceptsMouseClicks (false, false);
     matchAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (p.apvts, "match", matchButton);
 
     for (auto* c : std::initializer_list<juce::Component*> { &vu, &lamp, &rules, &meters })
@@ -772,7 +820,7 @@ DominatrixEditor::DominatrixEditor (DominatrixProcessor& p)
     deleteButton.onClick = [this] { confirmDelete(); };
 
     refreshPresetBox();
-    setSize (980, 620);
+    setSize (1060, 620);
     startTimerHz (30);
 }
 
@@ -815,41 +863,44 @@ void DominatrixEditor::resized()
     plates.clear();
     lamp.setBounds (16, 12, 88, 88);
     logoArea  = { 112, 8, 360, 70 };
-    badgeArea = { 488, 14, 260, 86 };
-    crestArea = { 496, 19, 76, 76 };
-    presetArea = { 762, 14, 200, 86 };
-    presetBox.setBounds (762, 36, 200, 26);
-    prevButton.setBounds (762, 70, 28, 24);
-    nextButton.setBounds (794, 70, 28, 24);
-    saveButton.setBounds (828, 70, 62, 24);
-    deleteButton.setBounds (896, 70, 66, 24);
+    badgeArea = { 548, 14, 260, 86 };
+    crestArea = { 556, 19, 76, 76 };
+    presetArea = { 842, 14, 200, 86 };
+    presetBox.setBounds (842, 36, 200, 26);
+    prevButton.setBounds (842, 70, 28, 24);
+    nextButton.setBounds (874, 70, 28, 24);
+    saveButton.setBounds (908, 70, 62, 24);
+    deleteButton.setBounds (976, 70, 66, 24);
     stripeArea = { 0, 110, getWidth(), 18 };
 
-    plates.push_back ({ "SATURATION TYPE", { 16, 138, 560, 86 }, true });
-    typeSel.setBounds (26, 162, 540, 54);
-    plates.push_back ({ "CEILING", { 586, 138, 232, 86 } });
-    ceilSel.setBounds (596, 162, 212, 54);
-    plates.push_back ({ "QUALITY", { 828, 138, 136, 86 } });
-    qualitySel.setBounds (836, 168, 120, 44);
+    plates.push_back ({ "SATURATION TYPE", { 16, 138, 640, 86 }, true });
+    typeSel.setBounds (26, 162, 620, 54);
+    plates.push_back ({ "CEILING", { 666, 138, 232, 86 } });
+    ceilSel.setBounds (676, 162, 212, 54);
+    plates.push_back ({ "QUALITY", { 908, 138, 136, 86 } });
+    qualitySel.setBounds (916, 168, 120, 44);
 
     plates.push_back ({ "GAIN REDUCTION", { 16, 234, 300, 214 } });
     vu.setBounds (28, 258, 276, 178);
     plates.push_back ({ "THE RULES", { 16, 458, 300, 146 } });
     rules.setBounds (28, 482, 276, 110);
 
-    plates.push_back ({ "CONTROLS", { 326, 234, 420, 370 } });
+    plates.push_back ({ "CONTROLS", { 326, 234, 500, 370 } });
     placeKnob (*disciplineKnob, { 336, 272, 180, 266 });
-    const int gx = 528, gw = 106, gh = 168;
-    placeKnob (*satKnob,    { gx,      260, gw, gh });
-    placeKnob (*analogKnob, { gx + gw, 260, gw, gh });
-    placeKnob (*mixKnob,    { gx,      260 + gh + 4, gw, gh });
-    placeKnob (*outKnob,    { gx + gw, 260 + gh + 4, gw, gh });
+    const int gx = 528, gw = 98, gh = 168;
+    placeKnob (*satKnob,    { gx,          260, gw, gh });
+    placeKnob (*analogKnob, { gx + gw,     260, gw, gh });
+    placeKnob (*widthKnob,  { gx + gw * 2, 260, gw, gh });
+    placeKnob (*mixKnob,    { gx,          260 + gh + 4, gw, gh });
+    placeKnob (*outKnob,    { gx + gw,     260 + gh + 4, gw, gh });
+    phase.setBounds (gx + gw * 2 + 4, 462, gw - 8, 58);
+    bassMonoButton.setBounds (gx + gw * 2 + 2, 530, gw - 4, 34);
 
-    plates.push_back ({ "METERS", { 756, 234, 208, 370 } });
-    meterArea = { 768, 260, 184, 206 };
+    plates.push_back ({ "METERS", { 836, 234, 208, 370 } });
+    meterArea = { 848, 260, 184, 206 };
     meters.setBounds (meterArea);
-    lufs.setBounds (768, 474, 184, 72);
-    matchButton.setBounds (768, 556, 184, 36);
+    lufs.setBounds (848, 474, 184, 72);
+    matchButton.setBounds (848, 556, 184, 36);
 
     buildBackdrop();
 }
@@ -991,8 +1042,13 @@ void DominatrixEditor::buildBackdrop()
         g.drawImage (hint1, juce::Rectangle<float> (336.0f, 550.0f, 180.0f, 14.0f));
         g.drawImage (hint2, juce::Rectangle<float> (336.0f, 566.0f, 180.0f, 14.0f));
     }
+    {   // a stamped STEREO tag over the phase meter + bass mono switch
+        auto st = tex::distressedText ("STEREO", 90, 16, tex::stencil (15.0f), pal::paint, juce::Justification::centred, scale, 0.18f, 63, 0.12f);
+        g.setOpacity (1.0f);
+        g.drawImage (st, juce::Rectangle<float> ((float) phase.getX() - 1.0f, 436.0f, 90.0f, 16.0f));
+    }
     // screen wells
-    for (auto rr : { meterArea, vu.getBounds(), rules.getBounds(), lufs.getBounds() })
+    for (auto rr : { meterArea, vu.getBounds(), rules.getBounds(), lufs.getBounds(), phase.getBounds() })
     {
         g.setColour (juce::Colours::black.withAlpha (0.7f)); g.fillRoundedRectangle (rr.toFloat().expanded (4.0f), 5.0f);
     }
@@ -1159,6 +1215,11 @@ void DominatrixEditor::timerCallback()
     meters.match = matchButton.getToggleState();
     meters.matchDb = e.matchDb.load();
     meters.repaint();
+
+    const float corr = e.correlation.load();
+    phaseSmooth += (corr - phaseSmooth) * 0.3f;
+    phase.value = phaseSmooth;
+    phase.repaint();
 
     auto& L = e.getLoudness();
     lufs.shortTerm = L.getShortTerm();

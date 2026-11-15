@@ -280,7 +280,8 @@ struct Params
 {
     float discipline = 0.3f, saturation = 0.2f, analog = 0.15f, mix = 1.0f, outputDb = 0.0f; // 0..1 except dB
     int satType = tape, ceiling = ceilMinus1, quality = 1; // quality: 0 = 2x, 1 = 4x, 2 = 8x
-    bool match = false;
+    bool match = false, bassMono = false;
+    float width = 1.0f;                                     // 0..2 (0 = mono, 1 = unchanged, 2 = twice the side)
 };
 
 //==============================================================================
@@ -342,8 +343,11 @@ public:
         tpStage.prepare (sr, blockMax);
         warmLeft = (int) (sr * 1.5);
 
-        for (auto* s : { &sDisc, &sSat, &sAnalog, &sMix, &sOut, &sCeil, &sMake })
+        for (auto* s : { &sDisc, &sSat, &sAnalog, &sMix, &sOut, &sCeil, &sMake, &sWidth, &sWComp })
             s->reset (sr, 0.04);
+        sWComp.setCurrentAndTargetValue (1.0f);
+        eMid = eSide = 0.0f; cLR = cLL = cRR = 0.0;
+        aCorr = std::exp (-1.0 / (sr * 0.3));
         sMatch.reset (sr, 0.3);
         sMatch.setCurrentAndTargetValue (1.0f);
         activeQ = -1;
@@ -386,10 +390,11 @@ public:
         sOut.setTargetValue (juce::Decibels::decibelsToGain (p.outputDb));
         sCeil.setTargetValue (juce::Decibels::decibelsToGain (ceilingDbFor (p.ceiling)));
         sMake.setTargetValue (makeupFor (p.discipline));
+        sWidth.setTargetValue (p.width);
         if (snapNext)
         {
-            for (auto* s : { &sDisc, &sSat, &sAnalog, &sMix, &sOut, &sCeil, &sMake }) s->setCurrentAndTargetValue (s->getTargetValue());
-            curType = prevType = p.satType; typeFade = 1.0f;
+            for (auto* s : { &sDisc, &sSat, &sAnalog, &sMix, &sOut, &sCeil, &sMake, &sWidth }) s->setCurrentAndTargetValue (s->getTargetValue());
+            curType = prevType = p.satType; typeFade = 1.0f; snapWidth = true;
             snapNext = false;
         }
     }
@@ -413,7 +418,7 @@ public:
 
     // metering (UI reads; peaks are exchanged with 0 by the UI)
     std::atomic<float> inPeak { 0 }, outPeak { 0 }, grDb { 0 }, clipDb { 0 };
-    std::atomic<float> threshDb { -18 }, ratioNow { 1.5f }, attackMs { 10 }, releaseMs { 120 }, makeupDb { 0 }, matchDb { 0 };
+    std::atomic<float> threshDb { -18 }, ratioNow { 1.5f }, attackMs { 10 }, releaseMs { 120 }, makeupDb { 0 }, matchDb { 0 }, correlation { 1 };
 
 private:
     struct Tone { Biquad bump, hp, roll; };
@@ -439,6 +444,10 @@ private:
         ironCoef = (float) (1.0 - std::exp (-juce::MathConstants<double>::twoPi * 150.0 / osRate));
         dcCoef = (float) std::exp (-juce::MathConstants<double>::twoPi * 6.0 / osRate);
         typeFadeInc = (float) (1.0 / (osRate * 0.03));
+        for (auto* b : { &xo.sLp1, &xo.sLp2, &xo.mLp1, &xo.mLp2 }) { b->design (Biquad::lowpass, osRate, 120.0, 0.7071067811865476); b->reset(); }
+        for (auto* b : { &xo.sHp1, &xo.sHp2, &xo.mHp1, &xo.mHp2 }) { b->design (Biquad::highpass, osRate, 120.0, 0.7071067811865476); b->reset(); }
+        widthBlendInc = (float) (1.0 / (osRate * 0.05));
+        kEnergy = (float) (1.0 - std::exp (-1.0 / (osRate * 1.0)));
     }
 
     inline float rnd() noexcept // fast white noise, -1..1
@@ -646,6 +655,14 @@ private:
             gSat[(size_t) i] = sSat.getNextValue(); gMix[(size_t) i] = sMix.getNextValue();
             gOut[(size_t) i] = sOut.getNextValue(); gCeil[(size_t) i] = sCeil.getNextValue();
         }
+        {   // WIDTH keeps the loudness steady: compensate for the side energy it adds or removes
+            const float wt = sWidth.getTargetValue();
+            const double em = std::max (eMid, 1e-12f), es = eSide;
+            const double k = std::sqrt ((em + es) / std::max (1e-12, em + (double) wt * wt * es));
+            sWComp.setTargetValue (numCh == 2 && std::abs (wt - 1.0f) > 1e-6f ? (float) juce::jlimit (0.7, 1.41, k) : 1.0f);
+        }
+        std::array<float, kChunk> gWidth, gWComp;
+        for (int i = 0; i < n; ++i) { gWidth[(size_t) i] = sWidth.getNextValue(); gWComp[(size_t) i] = sWComp.getNextValue(); }
         if (prm.satType != curType && typeFade >= 1.0f)
         {
             prevType = curType; curType = prm.satType; typeFade = 0.0f;
@@ -667,41 +684,73 @@ private:
         float clipPk = 0.0f;
         const float fadeStart = typeFade;
         const float compCur = satCompensation (curType, sSat.getCurrentValue()), compPrev = satCompensation (prevType, sSat.getCurrentValue());
-        for (int c = 0; c < numCh; ++c)
+        // per-sample, both channels together (the WIDTH stage needs left and right at once)
+        float* w[maxCh] = { upW.getChannelPointer (0), upW.getChannelPointer ((size_t) (numCh - 1)) };
+        const float* dr[maxCh] = { upD.getChannelPointer (0), upD.getChannelPointer ((size_t) (numCh - 1)) };
+        const bool stereo = numCh == 2;
+        const bool widthOn = stereo && (prm.bassMono || std::abs (sWidth.getCurrentValue() - 1.0f) > 1e-6f || std::abs (sWidth.getTargetValue() - 1.0f) > 1e-6f);
+        if (snapWidth) { wBlend = widthOn ? 1.0f : 0.0f; snapWidth = false; }
+        float tf = fadeStart;
+        for (int i = 0; i < upN; ++i)
         {
-            auto* w = upW.getChannelPointer ((size_t) c);
-            const auto* dr = upD.getChannelPointer ((size_t) c);
-            float tf = fadeStart;
-            for (int i = 0; i < upN; ++i)
+            const int bi = std::min (n - 1, i / factor);
+            const float a = gSat[(size_t) bi];
+            const bool fading = tf < 1.0f;
+            float y[maxCh] {};
+            for (int c = 0; c < numCh; ++c)
             {
-                const int bi = std::min (n - 1, i / factor);
-                const float a = gSat[(size_t) bi];
-                float x = w[i];
-                if (a > 0.0f || tf < 1.0f)
+                float x = w[c][i];
+                if (a > 0.0f || fading)
                 {
                     const float blend = std::min (1.0f, a * 2.0f);
                     float s = saturate (curType, sat[(size_t) c], x, a, bias) * compCur;
-                    if (tf < 1.0f)
+                    if (fading)
                     {
                         const float so = saturate (prevType, satOld[(size_t) c], x, a, bias) * compPrev;
                         s = so + tf * (s - so);
-                        tf = std::min (1.0f, tf + typeFadeInc);
                     }
                     x += blend * (s - x);
                 }
                 const float m = gMix[(size_t) bi];
-                float y = (dr[i] + m * (x - dr[i])) * gOut[(size_t) bi];
+                y[c] = (dr[c][i] + m * (x - dr[c][i])) * gOut[(size_t) bi];
+            }
+            if (fading) tf = std::min (1.0f, tf + typeFadeInc);
+
+            if (stereo)
+            {
+                // WIDTH: mid/side. Lows (below ~120 Hz) are never widened; BASS MONO makes them mono.
+                // Linkwitz-Riley split of the side at 120 Hz; the mid goes through the matching all-pass,
+                // so at 100 % / bass mono off the processed path equals the input (phase-rotated only)
+                const float mid = 0.5f * (y[0] + y[1]), side = 0.5f * (y[0] - y[1]);
+                const float sLo = xo.sLp2.process (xo.sLp1.process (side)), sHi = xo.sHp2.process (xo.sHp1.process (side));
+                const float mAp = xo.mLp2.process (xo.mLp1.process (mid)) + xo.mHp2.process (xo.mHp1.process (mid));
+                eMid += kEnergy * (mid * mid - eMid);
+                eSide += kEnergy * (side * side - eSide);
+                wBlend = widthOn ? std::min (1.0f, wBlend + widthBlendInc) : std::max (0.0f, wBlend - widthBlendInc);
+                if (wBlend > 0.0f)
+                {
+                    const float wv = gWidth[(size_t) bi];
+                    const float s2 = sHi * wv + sLo * (prm.bassMono ? 0.0f : std::min (wv, 1.0f));
+                    const float k = gWComp[(size_t) bi];
+                    const float l = (mAp + s2) * k, r = (mAp - s2) * k;
+                    y[0] += wBlend * (l - y[0]); y[1] += wBlend * (r - y[1]);
+                }
+            }
+
+            for (int c = 0; c < numCh; ++c)
+            {
+                float v = y[c];
                 if (clipOn)
                 {
                     const float cl = gCeil[(size_t) bi] * kInternalCeil;
-                    const float u = std::abs (y) / cl;
+                    const float u = std::abs (v) / cl;
                     clipPk = std::max (clipPk, u);
-                    if (u > knee) y = std::copysign (cl * (knee + (1.0f - knee) * std::tanh ((u - knee) / (1.0f - knee))), y);
+                    if (u > knee) v = std::copysign (cl * (knee + (1.0f - knee) * std::tanh ((u - knee) / (1.0f - knee))), v);
                 }
-                w[i] = y;
+                w[c][i] = v;
             }
-            if (c == numCh - 1) typeFade = tf;
         }
+        typeFade = tf;
         ow.processSamplesDown (wBlock);
 
         // ---------------------------------------------------------------- safety ceiling, meters, MATCH
@@ -713,7 +762,7 @@ private:
         }
         tpStage.process (ch, numCh, n, gCeil[(size_t) n - 1] * 0.995f, clipOn);
         double kSum = 0;
-        float outPk = 0.0f;
+        float outPk = 0.0f, corrL = 0.0f, corrR = 0.0f;
         for (int i = 0; i < n; ++i)
         {
             const float mg = sMatch.getNextValue();
@@ -724,11 +773,15 @@ private:
                 if (clipOn) y = juce::jlimit (-gCeil[(size_t) i], gCeil[(size_t) i], y);
                 const float k = kOut[(size_t) c].process (y);
                 s += (double) k * k;
+                if (c == 0) corrL = y; else corrR = y;
                 y *= mg;
                 ch[c][i] = y;
                 outPk = std::max (outPk, std::abs (y));
             }
-            if (numCh == 1) s *= 2.0;   // mono is played on both speakers
+            if (numCh == 1) { s *= 2.0; corrR = corrL; }   // mono is played on both speakers
+            cLR = (double) corrL * corrR + aCorr * (cLR - (double) corrL * corrR);
+            cLL = (double) corrL * corrL + aCorr * (cLL - (double) corrL * corrL);
+            cRR = (double) corrR * corrR + aCorr * (cRR - (double) corrR * corrR);
             kSum += s;
             matchOutMs = s + aMatch * (matchOutMs - s);
         }
@@ -739,6 +792,7 @@ private:
         grDb.store (std::max (grDb.load(), grMax));
         clipDb.store (std::max (clipDb.load(), clipOn && clipPk > knee ? juce::Decibels::gainToDecibels (clipPk / knee) : 0.0f));
         matchDb.store (juce::Decibels::gainToDecibels (sMatch.getCurrentValue()));
+        correlation.store (cLL * cRR > 1e-14 ? (float) juce::jlimit (-1.0, 1.0, cLR / std::sqrt (cLL * cRR)) : 1.0f);
     }
 
 public:
@@ -747,7 +801,7 @@ public:
 private:
     double sr = 44100.0, osSr = 176400.0;
     int blockMax = 512, activeQ = -1;
-    bool snapNext = true;
+    bool snapNext = true, snapWidth = true;
     Params prm;
     std::array<std::unique_ptr<juce::dsp::Oversampling<float>>, 3> osW, osD;
     juce::AudioBuffer<float> dryBuf;
@@ -781,6 +835,11 @@ private:
     LoudnessMeter loudness;
     TruePeakStage tpStage;
 
+    juce::SmoothedValue<float> sWidth { 1.0f }, sWComp { 1.0f };
+    struct Crossover { Biquad sLp1, sLp2, sHp1, sHp2, mLp1, mLp2, mHp1, mHp2; } xo;
+    float wBlend = 0.0f, widthBlendInc = 0.0001f;
+    float eMid = 0, eSide = 0, kEnergy = 0.0001f;
+    double cLR = 0, cLL = 0, cRR = 0, aCorr = 0.999;
     juce::SmoothedValue<float> sDisc { 0.0f }, sSat { 0.0f }, sAnalog { 0.0f }, sMix { 1.0f }, sOut { 1.0f }, sCeil { 1.0f }, sMake { 0.0f };
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Multiplicative> sMatch { 1.0f };
 };
