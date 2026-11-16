@@ -483,6 +483,35 @@ int main (int argc, char** argv)
         f.deleteFile();
     }
 
+
+    // ---------------- Castle Danger Link: The Master (in "another plugin binary") sets controls over the socket
+    {
+        DominatrixProcessor d;
+        auto otherBinary = cdlink::Node::createIsolatedForTesting();
+        juce::var lastStatus, lastApplied;
+        cdlink::Endpoint master ("master", [&] (const juce::var& m)
+        {
+            const auto t = m.getProperty ("type", "").toString();
+            if (t == "status" && m.getProperty ("from", "").toString() == d.getLink().getId()) lastStatus = m;
+            if (t == "applied") lastApplied = m;
+        }, otherBinary);
+        auto pump = [] (int ms) { juce::MessageManager::getInstance()->runDispatchLoopUntil (ms); };
+        for (int i = 0; i < 30 && ! master.isOnline(); ++i) pump (50);
+        pump (1600);
+        check (lastStatus.isObject() && (double) lastStatus.getProperty ("params", {}).getProperty ("discipline", -1.0) == 30.0,
+               "Dominatrix reports its controls over the link");
+        auto set = cdlink::Endpoint::makeMessage ("set");
+        auto* prm = new juce::DynamicObject();
+        prm->setProperty ("discipline", 45.0); prm->setProperty ("ceiling", 0.0); prm->setProperty ("outputDb", 3.5); prm->setProperty ("bassMono", 1.0);
+        set->setProperty ("params", juce::var (prm));
+        set->setProperty ("note", "test");
+        master.send (set, lastStatus.getProperty ("from", "").toString());
+        for (int i = 0; i < 40 && ! lastApplied.isObject(); ++i) pump (50);
+        check (std::abs (d.apvts.getRawParameterValue ("discipline")->load() - 45.0f) < 0.05f && std::abs (d.apvts.getRawParameterValue ("outputDb")->load() - 3.5f) < 0.05f
+               && d.apvts.getRawParameterValue ("bassMono")->load() > 0.5f && lastApplied.isObject(), "The Master can set Dominatrix's controls (and gets a confirmation)");
+        check (d.getLink().masterNearby() && d.getCurrentPresetName() == "Set by The Master", "Dominatrix shows it's linked and was set by The Master");
+    }
+
     // ---------------- GUI
     {
         DominatrixProcessor q;

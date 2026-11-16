@@ -2,6 +2,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "DomEngine.h"
 #include "Presets.h"
+#include "CDLink.h"
 
 class DominatrixProcessor : public juce::AudioProcessor
 {
@@ -36,6 +37,10 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     dom::Params currentParams() const;
 
+    // Castle Danger Link: The Master can read and set Dominatrix's controls
+    using Link = cdlink::PluginLink<juce::AudioProcessorValueTreeState>;
+    Link& getLink() { return *link; }
+
     // metering, read and reset by the editor
     dom::Engine& getEngine() { return engine; }
 
@@ -50,6 +55,7 @@ public:
 
 private:
     void resetToDefaults();
+    std::unique_ptr<Link> link;
     dom::Engine engine;
     int currentProgram = 0, reportedLatency = -1;
     juce::String currentPresetName { "Init" };

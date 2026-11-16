@@ -10,6 +10,9 @@ DominatrixProcessor::DominatrixProcessor()
                                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "Dominatrix", createLayout())
 {
+    link = std::make_unique<Link> ("dominatrix", "Dominatrix", JucePlugin_VersionString, apvts,
+        juce::StringArray { "discipline", "saturation", "satType", "analog", "mix", "width", "bassMono", "outputDb", "ceiling", "quality", "match" });
+    link->onSetByMaster = [this] (const juce::StringArray&) { currentPresetName = "Set by The Master"; ++presetVersion; };
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout DominatrixProcessor::createLayout()
@@ -78,8 +81,16 @@ void DominatrixProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     const int outCh = juce::jmin (2, buffer.getNumChannels());
     if (inCh == 1 && outCh > 1) buffer.copyFrom (1, 0, buffer, 0, 0, n); // mono in -> stereo out
 
+    auto power = [&]
+    {
+        double sum = 0;
+        for (int c = 0; c < outCh; ++c) { auto* d = buffer.getReadPointer (c); for (int i = 0; i < n; ++i) sum += (double) d[i] * d[i]; }
+        return sum / (double) juce::jmax (1, outCh * n);
+    };
+    const double inPow = power();
     engine.setParams (currentParams());
     engine.process (buffer.getArrayOfWritePointers(), outCh, n);
+    link->env.addPowers (inPow, power(), n);
     if (engine.getLatency() != reportedLatency)
     {
         reportedLatency = engine.getLatency();

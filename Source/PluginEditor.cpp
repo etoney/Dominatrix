@@ -872,6 +872,7 @@ void DominatrixEditor::resized()
     saveButton.setBounds (908, 70, 62, 24);
     deleteButton.setBounds (976, 70, 66, 24);
     stripeArea = { 0, 110, getWidth(), 18 };
+    linkArea = { 396, 86, 150, 14 };
 
     plates.push_back ({ "SATURATION TYPE", { 16, 138, 640, 86 }, true });
     typeSel.setBounds (26, 162, 620, 54);
@@ -1176,6 +1177,19 @@ void DominatrixEditor::paint (juce::Graphics& g)
     if (backdrop.isValid()) g.drawImage (backdrop, getLocalBounds().toFloat());
     else g.fillAll (pal::ironDark);
 
+    // Castle Danger Link status: a lamp + LINKED when The Master is in the session
+    {
+        auto& lk = proc.getLink();
+        const bool linked = lk.masterNearby();
+        const bool justSet = lk.getLastNoteTime() > 0 && juce::Time::getMillisecondCounter() - lk.getLastNoteTime() < 6000;
+        auto r = linkArea.toFloat();
+        const auto col = justSet ? pal::signalHot : (linked ? pal::hazard : pal::paintDim.withAlpha (0.35f));
+        if (linked) { juce::Path lp; lp.addEllipse (r.getX(), r.getCentreY() - 3.5f, 7, 7); juce::DropShadow (col.withAlpha (0.8f), 6, {}).drawForPath (g, lp); }
+        g.setColour (col); g.fillEllipse (r.getX(), r.getCentreY() - 3.5f, 7, 7);
+        g.setFont (tex::plainBold (9.5f).withExtraKerningFactor (0.1f));
+        g.drawText (justSet ? "SET BY THE MASTER" : (linked ? "LINKED TO THE MASTER" : "LINK"), r.withTrimmedLeft (11).toNearestInt(), juce::Justification::centredLeft);
+    }
+
     if (logoImage.isValid())
     {
         const float alpha = juce::jlimit (0.45f, 1.0f, 1.0f - flicker * 0.6f);
@@ -1189,6 +1203,7 @@ void DominatrixEditor::paint (juce::Graphics& g)
 
 void DominatrixEditor::timerCallback()
 {
+    if (++linkTick >= 15) { linkTick = 0; repaint (linkArea.expanded (8)); }
     auto& e = proc.getEngine();
     const float in = e.inPeak.exchange (0.0f), out = e.outPeak.exchange (0.0f);
     const float cl = e.clipDb.exchange (0.0f), gr = e.grDb.exchange (0.0f);

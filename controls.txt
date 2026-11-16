@@ -193,3 +193,24 @@ PRESETS
     Wide Screen                 glue plus a wider mix, bass kept mono
     Total Control               maximum discipline
     Safe Word (Clipper Only)    no compression, no colour: just the clipper
+
+
+-------------------------------------------------------------------------------
+CASTLE DANGER LINK (works with The Master)
+-------------------------------------------------------------------------------
+  Put The Master last on your master bus and Dominatrix links to it by itself
+  (nothing to set up, everything stays on your computer). The lamp under the
+  logo shows LINK status:
+    grey    LINK              no Master in the session
+    yellow  LINKED TO THE MASTER
+    red     SET BY THE MASTER  The Master just changed some controls
+
+  On The Master's FIX IT page, MY PLUGINS mode tells you which Castle Danger
+  plugins to put on the master bus and in what order. When you press APPLY
+  there, The Master sets Dominatrix's controls for you and explains what it
+  changed and why. It's exactly as if you'd turned the knobs: the changes
+  show here, you can undo them in your DAW, and you can change anything
+  afterwards.
+
+  Some DAWs ask the first time a plugin opens a local connection. Allow it;
+  the link only talks to 127.0.0.1 (this computer).
