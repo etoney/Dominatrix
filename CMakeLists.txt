@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # Must come BEFORE project(), or CMake ignores them: universal (Apple Silicon + Intel), macOS 11+
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
-project(DOMINATRIX VERSION 1.3.0)
+project(DOMINATRIX VERSION 1.3.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,7 +28,7 @@ juce_add_plugin(Dominatrix
     BUNDLE_ID com.castledanger.dominatrix
     PLUGIN_MANUFACTURER_CODE Cdgr
     PLUGIN_CODE Dmx1
-    FORMATS VST3 AU Standalone
+    FORMATS VST3 AU
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE

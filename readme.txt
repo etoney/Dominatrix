@@ -42,7 +42,6 @@ CONTENTS
      folder holding something like:
          VST3/Dominatrix.vst3
          AU/Dominatrix.component        (macOS build only)
-         Standalone/Dominatrix.app      (macOS) or Dominatrix.exe (Windows)
 
      If you've downloaded more than once, your browser may have named the newer
      file "Dominatrix-macOS (1).zip". Make sure you unzip the NEWEST one.
@@ -260,8 +259,6 @@ Windows has no AU format. Use Dominatrix.vst3.
   Unsigned plugins on Windows:
       - If the download was blocked: right-click the .zip BEFORE unzipping,
         choose Properties, tick "Unblock" at the bottom, click OK, then unzip.
-      - If SmartScreen warns when opening the Standalone .exe, click
-        "More info" > "Run anyway".
 
 
 -------------------------------------------------------------------------------
