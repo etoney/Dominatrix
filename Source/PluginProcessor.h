@@ -40,6 +40,10 @@ public:
     // Castle Danger Link: The Master can read and set Dominatrix's controls
     using Link = cdlink::PluginLink<juce::AudioProcessorValueTreeState>;
     Link& getLink() { return *link; }
+    juce::String getTrackName() const { const juce::ScopedLock sl (nameLock); return trackName; }
+    void updateTrackProperties (const TrackProperties& props) override { const juce::ScopedLock sl (nameLock); trackName = props.name.value_or (juce::String()); }
+    juce::CriticalSection nameLock;
+    juce::String trackName;
 
     // metering, read and reset by the editor
     dom::Engine& getEngine() { return engine; }

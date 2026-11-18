@@ -13,6 +13,8 @@ DominatrixProcessor::DominatrixProcessor()
     link = std::make_unique<Link> ("dominatrix", "Dominatrix", JucePlugin_VersionString, apvts,
         juce::StringArray { "discipline", "saturation", "satType", "analog", "mix", "width", "bassMono", "outputDb", "ceiling", "quality", "match" });
     link->onSetByMaster = [this] (const juce::StringArray&) { currentPresetName = "Set by The Master"; ++presetVersion; };
+    // for The Master: which track this copy is on (on the bass it plans a track saturation, not the bus)
+    link->extraStatus = [this] { auto* o = new juce::DynamicObject(); o->setProperty ("track", getTrackName()); return juce::var (o); };
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout DominatrixProcessor::createLayout()

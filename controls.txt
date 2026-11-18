@@ -212,5 +212,12 @@ CASTLE DANGER LINK (works with The Master)
   show here, you can undo them in your DAW, and you can change anything
   afterwards.
 
+  ON THE BASS: The Master (1.12 or later) can also ask for Dominatrix on a
+  bass track whose 120-500 Hz is thin (the part that lets a bass be heard on
+  phones and small speakers). Put it after The Servant on the bass. The
+  Master sets saturation only (TUBE for rock, WHIP for heavier genres),
+  DISCIPLINE 0, CEILING OFF and MATCH on, so the bass gets its harmonics
+  without changing its level.
+
   Some DAWs ask the first time a plugin opens a local connection. Allow it;
   the link only talks to 127.0.0.1 (this computer).
