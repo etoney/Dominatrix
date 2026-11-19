@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "Rebel.h"
 #include "PluginEditor.h"
 
 #ifndef JucePlugin_VersionString
@@ -37,6 +38,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout DominatrixProcessor::createL
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "ceiling", 1 }, "Ceiling", StringArray { "-1 dB", "-6 dB", "Off" }, 0));
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "quality", 1 }, "Quality", StringArray { "2x", "4x", "8x" }, 1));
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "match", 1 }, "Match (Level-Matched Listening)", false));
+    p.push_back (cdrebel::makeParam());
     return { p.begin(), p.end() };
 }
 
@@ -114,7 +116,7 @@ void DominatrixProcessor::resetToDefaults()
     for (auto* p : getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
             if (rp->getParameterID() != "match")       // MATCH is a listening switch, presets leave it alone
-                rp->setValueNotifyingHost (rp->getDefaultValue());
+                if (rp->getParameterID() != "rebel") rp->setValueNotifyingHost (rp->getDefaultValue());   // a preset never changes REBEL
 }
 
 void DominatrixProcessor::setCurrentProgram (int index)

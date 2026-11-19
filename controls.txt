@@ -221,3 +221,8 @@ CASTLE DANGER LINK (works with The Master)
 
   Some DAWs ask the first time a plugin opens a local connection. Allow it;
   the link only talks to 127.0.0.1 (this computer).
+
+REBEL  (next to the link lamp)
+  On: The Master keeps its hands off this plugin. Nothing it sends changes a setting here; it still
+  hears what the plugin does and plans the rest of the mix around it. Saved with the project; presets
+  never change it. Turn it off to let The Master run the plugin again.

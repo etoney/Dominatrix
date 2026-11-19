@@ -820,6 +820,7 @@ DominatrixEditor::DominatrixEditor (DominatrixProcessor& p)
     deleteButton.onClick = [this] { confirmDelete(); };
 
     refreshPresetBox();
+    addAndMakeVisible (rebel);
     setSize (1060, 620);
     startTimerHz (30);
 }
@@ -873,6 +874,7 @@ void DominatrixEditor::resized()
     deleteButton.setBounds (976, 70, 66, 24);
     stripeArea = { 0, 110, getWidth(), 18 };
     linkArea = { 396, 86, 150, 14 };
+    rebel.setBounds (linkArea.getX(), linkArea.getCentreY() - 8, 54, 16);
 
     plates.push_back ({ "SATURATION TYPE", { 16, 138, 640, 86 }, true });
     typeSel.setBounds (26, 162, 620, 54);
@@ -1182,12 +1184,13 @@ void DominatrixEditor::paint (juce::Graphics& g)
         auto& lk = proc.getLink();
         const bool linked = lk.masterNearby();
         const bool justSet = lk.getLastNoteTime() > 0 && juce::Time::getMillisecondCounter() - lk.getLastNoteTime() < 6000;
-        auto r = linkArea.toFloat();
-        const auto col = justSet ? pal::signalHot : (linked ? pal::hazard : pal::paintDim.withAlpha (0.35f));
+        const bool rebelOn = lk.isRebel();
+        auto r = linkArea.toFloat().withTrimmedLeft (60);   // REBEL sits first on the line
+        const auto col = rebelOn ? pal::signal : (justSet ? pal::signalHot : (linked ? pal::hazard : pal::paintDim.withAlpha (0.35f)));
         if (linked) { juce::Path lp; lp.addEllipse (r.getX(), r.getCentreY() - 3.5f, 7, 7); juce::DropShadow (col.withAlpha (0.8f), 6, {}).drawForPath (g, lp); }
         g.setColour (col); g.fillEllipse (r.getX(), r.getCentreY() - 3.5f, 7, 7);
         g.setFont (tex::plainBold (9.5f).withExtraKerningFactor (0.1f));
-        g.drawText (justSet ? "SET BY THE MASTER" : (linked ? "LINKED TO THE MASTER" : "LINK"), r.withTrimmedLeft (11).toNearestInt(), juce::Justification::centredLeft);
+        g.drawText (rebelOn ? "HANDS OFF" : (justSet ? "JUST SET" : (linked ? "LINKED" : "LINK")), r.withTrimmedLeft (11).toNearestInt(), juce::Justification::centredLeft);
     }
 
     if (logoImage.isValid())

@@ -348,6 +348,7 @@ public:
         : apvts (state), ids (std::move (paramIds)), name (displayName), ver (version),
           endpoint (kind, [this] (const juce::var& m) { handle (m); })
     {
+        ids.addIfNotAlreadyThere ("rebel");   // REBEL: The Master hands off (it sees the switch, never your other settings change)
         startTimerHz (4);
     }
     ~PluginLink() override { stopTimer(); }
@@ -362,6 +363,7 @@ public:
     juce::String getLastNote() const { return lastNote; }
     juce::uint32 getLastNoteTime() const { return lastNoteMs; }
     const juce::String& getId() const { return endpoint.getId(); }
+    bool isRebel() const { auto* rp = apvts.getParameter ("rebel"); return rp != nullptr && rp->getValue() > 0.5f; }
 
 private:
     void timerCallback() override { sendStatus ("*"); }
@@ -385,6 +387,19 @@ private:
         if (type == "hello") sendStatus (from);
         else if (type == "set")
         {
+            if (isRebel())
+            {
+                // REBEL: nothing The Master sends changes this plugin (only REBEL itself can be set)
+                auto* keep = new juce::DynamicObject();
+                if (auto* o = m.getProperty ("params", {}).getDynamicObject(); o != nullptr && o->hasProperty ("rebel")) keep->setProperty ("rebel", o->getProperty ("rebel"));
+                applySet (apvts, juce::var (keep));
+                auto r = Endpoint::makeMessage ("applied");
+                r->setProperty ("params", paramsToVar (apvts, ids));
+                r->setProperty ("changed", "");
+                r->setProperty ("rebel", true);
+                endpoint.send (r, from);
+                return;
+            }
             if (onBeforeSet) onBeforeSet();
             const auto changed = applySet (apvts, m.getProperty ("params", {}));
             lastNote = m.getProperty ("note", "").toString();
