@@ -35,7 +35,7 @@ DISCIPLINE  (the big knob)
                compression lets go slowly, so it glues without pumping.
     MAKEUP     automatic, so turning DISCIPLINE up doesn't just make it
                quieter.
-    The low end (below about 90 Hz) is kept out of the detector so the kick
+    The low end (below about 90 Hz) is kept out of what the compressor listens to, so the kick
     and bass don't make the whole mix duck. Left and right are linked so the
     stereo image stays put.
 
