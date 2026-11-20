@@ -8,7 +8,7 @@ project(DOMINATRIX VERSION 1.4.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Same JUCE version as DREAD, Possessed, BuzzKill and Chop Shop.
+# Same JUCE version as DREAD, Possessed, Dead Air and Cutthroat.
 # (Pass -DJUCE_LOCAL_DIR=/path/to/JUCE to build against a local checkout.)
 if(JUCE_LOCAL_DIR)
     add_subdirectory(${JUCE_LOCAL_DIR} JUCE)

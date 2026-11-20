@@ -27,4 +27,4 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --target Dominatrix_VST3
 ```
 
-Built with JUCE 8.0.15 (same as DREAD, Possessed, BuzzKill and Chop Shop).
+Built with JUCE 8.0.15 (same as DREAD, Possessed, Dead Air and Cutthroat).
